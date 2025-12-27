@@ -1,0 +1,72 @@
+# {{ app }}
+
+{{ description }}
+
+## Installation
+
+Install this tool using `uv`:
+
+```bash
+uv pip install {{ app }}
+```
+
+Or using `pip`:
+
+```bash
+pip install {{ app }}
+```
+
+## Usage
+
+For help, run:
+
+```bash
+{{ app }} --help
+```
+
+You can also use:
+
+```bash
+python -m {{ app_underscored }} --help
+```
+
+## Development
+
+To contribute to this tool, first checkout the code. Then create a new virtual environment:
+
+```bash
+cd {{ app }}
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+```
+
+Now install the dependencies and test dependencies:
+
+```bash
+uv sync
+```
+
+### Available Make Commands
+
+This project uses a Makefile for common development tasks:
+
+```bash
+make help      # Show all available commands
+make install   # Install dependencies using uv
+make lint      # Run code quality checks
+make format    # Format code with ruff
+make test      # Run tests with pytest
+make test-cov  # Run tests with coverage report
+make clean     # Clean build and cache artifacts
+make build     # Build package distribution
+make publish   # Publish package to PyPI
+make dev       # Install package in development mode
+```
+
+To run the tests:
+
+```bash
+make test
+# or
+uv run pytest
+```

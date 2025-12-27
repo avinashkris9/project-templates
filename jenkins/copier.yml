@@ -1,0 +1,22 @@
+project_name:
+  type: str
+  help: Project name
+  default: my-ci-pipeline
+
+language:
+  type: str
+  help: Choose your project language
+  choices:
+    - python
+    - java
+  default: python
+
+docker_image:
+  type: str
+  help: Docker image name (e.g., my-app or registry.example.com/my-app)
+  default: "{{ project_name.lower().replace(' ', '-').replace('_', '-') }}"
+
+slack_channel:
+  type: str
+  help: Slack channel for notifications (leave empty to disable)
+  default: ""

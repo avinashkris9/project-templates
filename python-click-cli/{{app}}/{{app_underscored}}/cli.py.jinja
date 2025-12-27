@@ -1,0 +1,124 @@
+"""Command-line interface for {{ app }}."""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+from typing import NoReturn
+
+import click
+
+
+class CliError(click.ClickException):
+    """Custom exception for CLI errors with better formatting."""
+
+    def format_message(self) -> str:
+        """Format the error message with red color."""
+        return click.style(f"Error: {self.message}", fg="red")
+
+
+@click.group(
+    context_settings={
+        "help_option_names": ["-h", "--help"],
+        "allow_interspersed_args": True,
+    },
+    invoke_without_command=True,
+)
+@click.version_option()
+@click.option(
+    "-v",
+    "--verbose",
+    is_flag=True,
+    help="Enable verbose output",
+)
+@click.option(
+    "--debug",
+    is_flag=True,
+    help="Enable debug mode",
+)
+@click.pass_context
+def cli(ctx: click.Context, verbose: bool, debug: bool) -> None:
+    """{{ description }}
+    
+    For more information, visit: https://github.com/{{ github_username }}/{{ app }}
+    """
+    # Ensure ctx.obj exists for passing state between commands
+    ctx.ensure_object(dict)
+    ctx.obj["verbose"] = verbose
+    ctx.obj["debug"] = debug
+    
+    if debug:
+        click.echo(click.style("Debug mode enabled", fg="yellow"))
+    
+    # Show help if no subcommand is provided
+    if ctx.invoked_subcommand is None:
+        click.echo(ctx.get_help())
+
+
+@cli.command()
+@click.option(
+    "--name",
+    prompt="What is your name?",
+    help="Your name",
+)
+@click.option(
+    "--count",
+    type=click.IntRange(1, 10),
+    default=1,
+    help="Number of greetings (1-10)",
+)
+@click.option(
+    "--color",
+    type=click.Choice(["red", "green", "blue"], case_sensitive=False),
+    default="green",
+    help="Color for the greeting",
+)
+def greet(name: str, count: int, color: str) -> None:
+    """Greet someone with style.
+    
+    This is an example command showing interactive prompts,
+    range validation, and colored output.
+    """
+    for _ in range(count):
+        click.secho(f"Hello, {name}! 👋", fg=color, bold=True)
+
+
+@cli.command()
+@click.pass_context
+def info(ctx: click.Context) -> None:
+    """Display information about {{ app }}."""
+    from importlib.metadata import version, metadata
+    
+    try:
+        pkg_version: str = version("{{ app }}")
+        pkg_metadata = metadata("{{ app }}")
+        
+        click.echo(click.style("{{ app }}", fg="blue", bold=True))
+        click.echo(f"Version: {pkg_version}")
+        click.echo(f"Author: {pkg_metadata.get('Author', 'Unknown')}")
+        click.echo(f"License: {pkg_metadata.get('License', 'Unknown')}")
+        click.echo(f"Python: {sys.version.split()[0]}")
+        
+    except Exception as e:
+        click.secho(f"Could not retrieve package info: {e}", fg="red")
+        ctx.exit(1)
+
+
+def main() -> NoReturn:
+    """Entry point for the CLI."""
+    try:
+        cli(prog_name="{{ app }}")
+        sys.exit(0)
+    except KeyboardInterrupt:
+        click.echo("\n\nInterrupted by user", err=True)
+        sys.exit(130)
+    except CliError as e:
+        click.echo(str(e), err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.secho(f"Unexpected error: {e}", fg="red", err=True)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

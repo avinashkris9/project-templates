@@ -1,0 +1,235 @@
+pipeline {
+  agent {
+    kubernetes {
+      yaml """
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: docker
+    image: docker:24.0-dind
+    securityContext:
+      privileged: true
+    env:
+    - name: DOCKER_TLS_CERTDIR
+      value: ""
+    volumeMounts:
+    - name: docker-sock
+      mountPath: /var/run
+{%- if language == "java" %}
+  - name: maven
+    image: maven:3.9.9-eclipse-temurin-17
+    command: ['cat']
+    tty: true
+    volumeMounts:
+    - name: maven-cache
+      mountPath: /root/.m2
+{%- endif %}
+{%- if language == "python" %}
+  - name: python
+    image: python:3.11-slim
+    command: ['cat']
+    tty: true
+    volumeMounts:
+    - name: pip-cache
+      mountPath: /root/.cache/pip
+{%- endif %}
+  volumes:
+  - name: docker-sock
+    emptyDir: {}
+{%- if language == "java" %}
+  - name: maven-cache
+    emptyDir: {}
+{%- endif %}
+{%- if language == "python" %}
+  - name: pip-cache
+    emptyDir: {}
+{%- endif %}
+"""
+    }
+  }
+
+  environment {
+    PROJECT_NAME = "{{ project_name }}"
+    DOCKER_IMAGE = "{{ docker_image }}"
+    LANGUAGE = "{{ language }}"
+{%- if slack_channel %}
+    SLACK_CHANNEL = "{{ slack_channel }}"
+{%- endif %}
+{%- if docker_registry %}
+    DOCKER_REGISTRY = "{{ docker_registry }}"
+{%- endif %}
+  }
+
+  options {
+    buildDiscarder(logRotator(numToKeepStr: '10'))
+    timestamps()
+    timeout(time: 30, unit: 'MINUTES')
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+        script {
+          env.GIT_COMMIT_SHORT = sh(
+            script: "git rev-parse --short HEAD",
+            returnStdout: true
+          ).trim()
+          env.IMAGE_TAG = "${env.DOCKER_IMAGE}:${env.GIT_COMMIT_SHORT}"
+        }
+      }
+    }
+
+{%- if language == "java" %}
+    stage('Build') {
+      steps {
+        container('maven') {
+          sh '''
+            mvn -B -DskipTests clean package
+          '''
+        }
+      }
+    }
+
+    stage('Unit Test') {
+      steps {
+        container('maven') {
+          sh '''
+            mvn test
+          '''
+        }
+      }
+      post {
+        always {
+          junit '**/target/surefire-reports/*.xml'
+          archiveArtifacts artifacts: '**/target/*.jar', fingerprint: true, allowEmptyArchive: true
+        }
+      }
+    }
+{%- endif %}
+
+{%- if language == "python" %}
+    stage('Setup') {
+      steps {
+        container('python') {
+          sh '''
+            python --version
+            pip install --upgrade pip
+            pip install -r requirements.txt
+          '''
+        }
+      }
+    }
+
+    stage('Lint') {
+      steps {
+        container('python') {
+          sh '''
+            pip install flake8
+            flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics || true
+          '''
+        }
+      }
+    }
+
+    stage('Unit Test') {
+      steps {
+        container('python') {
+          sh '''
+            pip install pytest pytest-cov
+            pytest --junitxml=pytest-report.xml --cov=. --cov-report=xml --cov-report=html
+          '''
+        }
+      }
+      post {
+        always {
+          junit 'pytest-report.xml'
+          archiveArtifacts artifacts: 'pytest-report.xml,htmlcov/**', fingerprint: true, allowEmptyArchive: true
+        }
+      }
+    }
+{%- endif %}
+
+    stage('Docker Build') {
+      steps {
+        container('docker') {
+          script {
+            sh """
+              docker build -t ${env.IMAGE_TAG} -t ${env.DOCKER_IMAGE}:latest .
+            """
+          }
+        }
+      }
+    }
+
+{%- if docker_registry %}
+    stage('Docker Push') {
+      when {
+        anyOf {
+          branch 'main'
+          branch 'master'
+          branch 'develop'
+        }
+      }
+      steps {
+        container('docker') {
+          script {
+            withCredentials([usernamePassword(
+              credentialsId: 'docker-registry-credentials',
+              usernameVariable: 'DOCKER_USER',
+              passwordVariable: 'DOCKER_PASS'
+            )]) {
+              sh """
+                echo \${DOCKER_PASS} | docker login ${env.DOCKER_REGISTRY} -u \${DOCKER_USER} --password-stdin
+                docker push ${env.IMAGE_TAG}
+                docker push ${env.DOCKER_IMAGE}:latest
+                docker logout ${env.DOCKER_REGISTRY}
+              """
+            }
+          }
+        }
+      }
+    }
+{%- endif %}
+  }
+
+  post {
+    success {
+{%- if slack_channel %}
+      slackSend(
+        channel: env.SLACK_CHANNEL,
+        color: 'good',
+        message: """
+SUCCESS: ${env.PROJECT_NAME}
+Job: ${env.JOB_NAME} #${env.BUILD_NUMBER}
+Commit: ${env.GIT_COMMIT_SHORT}
+Image: ${env.IMAGE_TAG}
+<${env.BUILD_URL}|View Build>
+        """.stripIndent()
+      )
+{%- else %}
+      echo "Build succeeded: ${env.IMAGE_TAG}"
+{%- endif %}
+    }
+    failure {
+{%- if slack_channel %}
+      slackSend(
+        channel: env.SLACK_CHANNEL,
+        color: 'danger',
+        message: """
+FAILED: ${env.PROJECT_NAME}
+Job: ${env.JOB_NAME} #${env.BUILD_NUMBER}
+Commit: ${env.GIT_COMMIT_SHORT}
+<${env.BUILD_URL}console|View Console>
+        """.stripIndent()
+      )
+{%- else %}
+      echo "Build failed. Check console output."
+{%- endif %}
+    }
+    always {
+      cleanWs()
+    }
+  }
+}

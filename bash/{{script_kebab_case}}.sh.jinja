@@ -1,0 +1,293 @@
+#!/usr/bin/env bash
+###############################################################################
+# {{ script_kebab_case }}.sh
+# {{ script_description }}
+#
+# Author: {{ author_name }}
+# Created: $(date '+%Y-%m-%d')
+# Version: {{ version }}
+#
+# Usage: ./{{ script_kebab_case }}.sh [OPTIONS]
+###############################################################################
+
+{% if include_error_handling -%}
+# Exit on error, undefined variables, and pipe failures
+set -euo pipefail
+
+# Enable debug mode if DEBUG env var is set
+[[ "${DEBUG:-0}" == "1" ]] && set -x
+
+{% endif -%}
+{% if include_colors -%}
+# Color codes for output
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[1;33m'
+readonly BLUE='\033[0;34m'
+readonly MAGENTA='\033[0;35m'
+readonly CYAN='\033[0;36m'
+readonly BOLD='\033[1m'
+readonly NC='\033[0m' # No Color
+
+
+
+{% endif -%}
+# Script directory and name
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
+
+{% if include_logging -%}
+# Logging configuration
+readonly LOG_DIR="${SCRIPT_DIR}/logs"
+readonly LOG_FILE="${LOG_DIR}/${SCRIPT_NAME%.sh}_$(date '+%Y%m%d').log"
+LOG_LEVEL="{{ log_level }}"
+
+# Create log directory if it doesn't exist
+mkdir -p "${LOG_DIR}"
+
+# Log levels
+declare -A LOG_LEVELS=([DEBUG]=0 [INFO]=1 [WARN]=2 [ERROR]=3)
+
+# Logging functions
+log() {
+  local level="$1"
+  shift
+  local message="$*"
+  local timestamp
+  timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+
+  # Check if we should log this level
+  if [[ ${LOG_LEVELS[$level]:-0} -ge ${LOG_LEVELS[$LOG_LEVEL]:-0} ]]; then
+    echo "[${timestamp}] [${level}] ${message}" >> "${LOG_FILE}"
+
+    case "${level}" in
+      ERROR)
+        {% if include_colors -%}
+        echo -e "${RED}[ERROR]${NC} ${message}" >&2
+        {%- else -%}
+        echo "[ERROR] ${message}" >&2
+        {%- endif %}
+        ;;
+      WARN)
+        {% if include_colors -%}
+        echo -e "${YELLOW}[WARN]${NC} ${message}" >&2
+        {%- else -%}
+        echo "[WARN] ${message}" >&2
+        {%- endif %}
+        ;;
+      INFO)
+        {% if include_colors -%}
+        echo -e "${GREEN}[INFO]${NC} ${message}"
+        {%- else -%}
+        echo "[INFO] ${message}"
+        {%- endif %}
+        ;;
+      DEBUG)
+        {% if include_colors -%}
+        echo -e "${BLUE}[DEBUG]${NC} ${message}"
+        {%- else -%}
+        echo "[DEBUG] ${message}"
+        {%- endif %}
+        ;;
+    esac
+  fi
+}
+
+log_error() { log "ERROR" "$@"; }
+log_warn() { log "WARN" "$@"; }
+log_info() { log "INFO" "$@"; }
+log_debug() { log "DEBUG" "$@"; }
+
+{% endif -%}
+{% if include_error_handling -%}
+# Cleanup function
+cleanup() {
+  local exit_code=$?
+  {% if include_logging -%}
+  log_debug "Performing cleanup (exit code: ${exit_code})..."
+  {% endif -%}
+
+  # Add cleanup tasks here (temp files, connections, etc.)
+
+  exit "${exit_code}"
+}
+
+# Error exit function
+error_exit() {
+  local message="$1"
+  local exit_code="${2:-1}"
+
+  {% if include_logging -%}
+  log_error "${message}"
+  {%- else -%}
+  echo "ERROR: ${message}" >&2
+  {%- endif %}
+
+  exit "${exit_code}"
+}
+
+# Set up trap for cleanup
+trap cleanup EXIT INT TERM
+
+{% endif -%}
+{% if include_help -%}
+# Display help message
+show_help() {
+  cat << EOF
+Usage: ${SCRIPT_NAME} [OPTIONS]
+
+{{ script_description }}
+
+OPTIONS:
+    -h, --help              Show this help message
+    -v, --verbose           Enable verbose output
+    -d, --dry-run           Run in dry-run mode (no changes)
+    {%- if include_logging %}
+    -l, --log-level LEVEL   Set log level (DEBUG, INFO, WARN, ERROR)
+    {%- endif %}
+
+EXAMPLES:
+    ${SCRIPT_NAME} --verbose
+    ${SCRIPT_NAME} --dry-run
+    {%- if include_logging %}
+    ${SCRIPT_NAME} --log-level DEBUG
+    {%- endif %}
+EOF
+}
+
+{% endif -%}
+{% if include_arg_parsing -%}
+# Parse command line arguments
+VERBOSE=false
+DRY_RUN=false
+
+parse_args() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -h|--help)
+        {% if include_help -%}
+        show_help
+        {%- else -%}
+        echo "Help message"
+        {%- endif %}
+        exit 0
+        ;;
+      --verbose)
+        VERBOSE=true
+        {% if include_logging -%}
+        LOG_LEVEL="DEBUG"
+        log_debug "Verbose mode enabled"
+        {%- endif %}
+        shift
+        ;;
+      -d|--dry-run)
+        DRY_RUN=true
+        {% if include_logging -%}
+        log_info "Running in dry-run mode"
+        {%- else -%}
+        echo "Running in dry-run mode"
+        {%- endif %}
+        shift
+        ;;
+      {%- if include_logging %}
+      -l|--log-level)
+        if [[ -z "${2:-}" ]] || [[ "${2}" == -* ]]; then
+          {% if include_error_handling -%}
+          error_exit "Log level requires an argument"
+          {%- else -%}
+          echo "ERROR: Log level requires an argument" >&2
+          exit 1
+          {%- endif %}
+        fi
+        LOG_LEVEL="$2"
+        shift 2
+        ;;
+      {%- endif %}
+      --)
+        shift
+        break
+        ;;
+      -*)
+        {% if include_error_handling -%}
+        error_exit "Unknown option: $1"
+        {%- else -%}
+        echo "ERROR: Unknown option: $1" >&2
+        exit 1
+        {%- endif %}
+        ;;
+      *)
+        # Positional arguments
+        break
+        ;;
+    esac
+  done
+
+  # Remaining positional arguments are in "$@"
+}
+
+{% endif -%}
+# Validation functions
+validate_input() {
+  # Add input validation logic here
+  return 0
+}
+
+# Main business logic
+process() {
+  {% if include_logging -%}
+  log_info "Processing..."
+  {%- else -%}
+  echo "Processing..."
+  {%- endif %}
+
+  # Your main script logic goes here
+  {%- if include_arg_parsing %}
+  if [[ "${DRY_RUN}" == "true" ]]; then
+    {% if include_logging -%}
+    log_info "[DRY-RUN] Would perform actions here"
+    {%- else -%}
+    echo "[DRY-RUN] Would perform actions here"
+    {%- endif %}
+    return 0
+  fi
+  {%- endif %}
+
+  # Actual work here
+  {%- if include_logging %}
+  log_debug "Executing main logic..."
+  {%- endif %}
+
+  # Example command
+  # some_command || error_exit "Command failed"
+
+  return 0
+}
+
+# Main function
+main() {
+  {% if include_logging -%}
+  log_info "Starting {{ script_kebab_case }}"
+  {% endif -%}
+
+  # Validate input
+  validate_input
+
+  # Execute main logic
+  process
+
+  {% if include_logging -%}
+  log_info "Completed successfully!"
+  {%- else -%}
+  echo "Completed successfully!"
+  {%- endif %}
+
+  return 0
+}
+
+# Script entry point
+{%- if include_arg_parsing %}
+parse_args "$@"
+{%- endif %}
+main
+
+exit 0

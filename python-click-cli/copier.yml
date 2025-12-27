@@ -1,0 +1,57 @@
+
+_metadata:
+  template_version: "1.0.0"
+  template_url: "https://github.com/{{ github_username }}/{{ app }}"
+
+# # Exclude files from being copied
+# _exclude:
+#   - "copier.yml"
+#   - "copier.yaml"
+#   - "~*"
+#   - "*.py[co]"
+#   - "__pycache__"
+#   - ".git"
+#   - ".DS_Store"
+
+
+
+app_name:
+  type: str
+  help: What is your application name?
+  placeholder: "My Awesome App"
+  validator: "{% if not app_name %}Required field{% endif %}"
+
+description:
+  type: str
+  help: Provide a brief description of your application
+  placeholder: "A brief description of what this app does"
+  default: ""
+
+github_username:
+  type: str
+  help: What is your GitHub username?
+  placeholder: "octocat"
+  validator: >-
+    {% if not github_username %}
+    GitHub username is required
+    {% elif ' ' in github_username %}
+    GitHub username cannot contain spaces
+    {% endif %}
+
+author_name:
+  type: str
+  help: What is your full name?
+  placeholder: "John Doe"
+  default: "{{ github_username }}"
+
+# Computed variables (derived from other answers)
+app:
+  type: str
+  default: "{{ app_name.lower().replace(' ', '-').replace('_', '-') }}"
+  when: false  # Hidden variable, automatically computed
+
+app_underscored:
+  type: str
+  default: "{{ app.replace('-', '_') }}"
+  when: false  # Hidden variable, automatically computed
+

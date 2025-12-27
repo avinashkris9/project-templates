@@ -1,0 +1,26 @@
+from click.testing import CliRunner
+from {{ app_underscored }}.cli import cli
+
+
+def test_version():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        result = runner.invoke(cli, ["--version"], prog_name="{{ app }}")
+        assert result.exit_code == 0
+        assert result.output.startswith("{{ app }}, version ")
+
+
+def test_help():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["--help"])
+    assert result.exit_code == 0
+    assert "Usage:" in result.output
+
+
+def test_cli_without_args():
+    """Test CLI without arguments shows help."""
+    runner = CliRunner()
+    result = runner.invoke(cli, [])
+    # Click groups exit with code 0 when showing help
+    assert result.exit_code == 0
+    assert "Usage:" in result.output

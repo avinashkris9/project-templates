@@ -1,0 +1,129 @@
+# Exclude patterns
+_exclude:
+  - copier.yml
+  - copier.yaml
+  - "*.pyc"
+  - "__pycache__"
+  - ".git"
+  - ".DS_Store"
+
+# Template questions/variables
+script_name:
+  type: str
+  help: What is the name of your script?
+  default: my-script
+  validator: >-
+    {% if not script_name %}
+    Script name cannot be empty
+    {% endif %}
+
+script_kebab_case:
+  type: str
+  help: Script kebabcase  (auto-generated from script_name)
+  default: "{{ script_name.lower().replace(' ', '-').replace('_', '-') }}"
+  when: false  # This is computed, don't ask the user
+
+script_description:
+  type: str
+  help: Brief description of what the script does
+  default: A sample bash script
+
+github_username:
+  type: str
+  help: What is your GitHub username?
+  placeholder: "octocat"
+  validator: >-
+    {% if not github_username %}
+    GitHub username is required
+    {% elif ' ' in github_username %}
+    GitHub username cannot contain spaces
+    {% endif %}
+
+author_name:
+  type: str
+  help: What is your full name?
+  placeholder: "John Doe"
+  default: "{{ github_username }}"
+
+
+
+version:
+  type: str
+  help: Initial version number
+  default: "1.0.0"
+  validator: >-
+    {% if not version.split('.')|length == 3 %}
+    Version should follow semantic versioning (e.g., 1.0.0)
+    {% endif %}
+
+include_logging:
+  type: bool
+  help: Include logging functionality?
+  default: true
+
+log_level:
+  type: str
+  help: Default log level
+  default: INFO
+  choices:
+    - INFO
+    - DEBUG
+    - WARN
+    - ERROR
+  when: "{{ include_logging }}"
+
+include_arg_parsing:
+  type: bool
+  help: Include command-line argument parsing?
+  default: true
+
+include_error_handling:
+  type: bool
+  help: Include error handling (set -euo pipefail)?
+  default: true
+
+include_help:
+  type: bool
+  help: Include help/usage message?
+  default: true
+  when: "{{ include_arg_parsing }}"
+
+include_colors:
+  type: bool
+  help: Include colored output?
+  default: true
+
+# # Tasks to run after template generation
+# _tasks:
+#   - command: chmod +x {{ script_kebab_case }}.sh
+#     when: "{{ _copier_conf.os != 'nt' }}"
+#   - command: echo "✅ Script created successfully at {{ script_kebab_case }}.sh"
+  
+# # Messages
+# _message_before_copy: |
+  
+#   ╔════════════════════════════════════════╗
+#   ║   Bash Script Template Generator      ║
+#   ╚════════════════════════════════════════╝
+  
+#   This will create a production-ready bash script
+#   with customizable features.
+
+# _message_after_copy: |
+  
+#   ╔════════════════════════════════════════╗
+#   ║         Script Created! 🎉            ║
+#   ╚════════════════════════════════════════╝
+  
+#   Your script: {{ script_kebab_case }}.sh
+  
+#   Next steps:
+#     1. Review and customize the script
+#     2. Run: ./{{ script_kebab_case }}.sh --help
+#     3. Start coding in the main() function
+  
+#   {% if include_logging %}
+#   Log file will be: {{ script_kebab_case }}.log
+#   {% endif %}
+  
+#   Happy scripting! 🚀

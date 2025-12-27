@@ -1,0 +1,38 @@
+.PHONY: all default help install lint format test clean
+
+all: help
+default: help
+
+PY=uv run
+LINT=ruff
+TEST=pytest
+
+help:  ## Show help messages for make targets
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[32m%-30s\033[0m %s\n", $$1, $$2}'
+
+install:  ## Install dependencies using uv (uses pyproject.toml)
+	uv sync
+
+lint:  ## Run code quality checks
+	$(LINT) check .
+
+format:  ## Format code with ruff
+	$(LINT) format .
+
+test:  ## Run tests with pytest
+	$(PY) -m $(TEST) --maxfail=1 --disable-warnings -q
+
+test-cov:  ## Run tests with coverage report
+	$(PY) -m $(TEST) --cov={{ app_underscored }} --cov-report=term-missing --cov-report=html
+
+clean:  ## Clean build and cache artifacts
+	rm -rf .pytest_cache __pycache__ dist build *.egg-info .coverage htmlcov .ruff_cache
+
+build:  ## Build package distribution
+	uv build
+
+publish:  ## Publish package to PyPI (requires UV_PUBLISH_TOKEN or credentials)
+	uv publish
+
+dev:  ## Install package in development mode
+	uv pip install -e '.[test]'

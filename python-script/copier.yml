@@ -1,0 +1,23 @@
+# Basic project metadata
+
+app_name:
+  type: str
+  help: What is your application name?
+  placeholder: "My Awesome App"
+  validator: "{% if not app_name %}Required field{% endif %}"
+
+description:
+  type: str
+  help: Provide a brief description of your application
+  placeholder: "Python script to do something"
+  default: "Python script to do something"
+
+app:
+  type: str
+  default: "{{ app_name.lower().replace(' ', '-').replace('_', '-') }}"
+  when: false  # Hidden variable, automatically computed
+
+app_underscored:
+  type: str
+  default: "{{ app.replace('-', '_') }}"
+  when: false  # Hidden variable, automatically computed

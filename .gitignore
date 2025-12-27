@@ -1,0 +1,25 @@
+
+*.py[cod]
+*.egg-info
+*.eggs
+
+dist
+.cache
+
+
+
+# ide
+.idea
+.eclipse
+.vscode
+
+
+# virtual environments
+env
+env3
+venv
+venv3
+.venv
+.venv3
+
+.swp
